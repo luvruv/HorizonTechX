@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="Horizon TechX URL Shortener - A premium, modern tool to shorten long links and track click statistics instantly.">
+    <title>Horizon Link Shortener | Trim, Share & Track</title>
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <!-- FontAwesome for Premium Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Custom Style Sheet -->
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <!-- Background Decorators -->
+    <div class="bg-glow bg-glow-1"></div>
+    <div class="bg-glow bg-glow-2"></div>
+
+    <div class="wrapper">
+        <!-- Header -->
+        <header>
+            <div class="logo">
+                <i class="fa-solid fa-bolt logo-icon"></i>
+                <span class="logo-text">Horizon<span class="highlight">Shortener</span></span>
+            </div>
+            <p class="tagline">Simplify your links, expand your reach, and track engagement effortlessly.</p>
+        </header>
+
+        <!-- Main Workspace -->
+        <main>
+            <!-- Shortener Form -->
+            <section class="card shortener-card">
+                <form id="shortener-form">
+                    <div class="input-group">
+                        <span class="input-icon"><i class="fa-solid fa-link"></i></span>
+                        <input 
+                            type="url" 
+                            id="long-url" 
+                            placeholder="Paste your long URL here (e.g. https://example.com/very/long/path)" 
+                            required
+                        >
+                        <button type="submit" id="submit-btn" class="btn btn-primary">
+                            <span>Shorten</span>
+                            <i class="fa-solid fa-arrow-right"></i>
+                        </button>
+                    </div>
+                </form>
+
+                <!-- Status Messages -->
+                <div id="status-message" class="message hidden"></div>
+
+                <!-- Result Area (hidden by default) -->
+                <div id="result-area" class="result-area hidden">
+                    <div class="result-label">Your shortened link is ready:</div>
+                    <div class="result-box">
+                        <input type="text" id="short-url" readonly>
+                        <button id="copy-btn" class="btn btn-secondary" title="Copy to clipboard">
+                            <i class="fa-regular fa-copy"></i>
+                            <span>Copy</span>
+                        </button>
+                        <a id="visit-btn" href="#" target="_blank" class="btn btn-icon-only" title="Open Link">
+                            <i class="fa-solid fa-up-right-from-square"></i>
+                        </a>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Link History -->
+            <section class="history-section">
+                <div class="history-header">
+                    <h2><i class="fa-solid fa-clock-rotate-left header-icon"></i>Recent Shortened Links</h2>
+                    <button id="refresh-btn" class="btn btn-icon-only" title="Refresh list">
+                        <i class="fa-solid fa-rotate"></i>
+                    </button>
+                </div>
+
+                <div class="history-container card">
+                    <div class="table-responsive">
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>Original Link</th>
+                                    <th>Shortened Link</th>
+                                    <th>Clicks</th>
+                                    <th>Created On</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody id="history-list">
+                                <!-- Dynamically loaded -->
+                                <tr class="empty-state">
+                                    <td colspan="5">
+                                        <i class="fa-regular fa-folder-open empty-icon"></i>
+                                        <p>No shortened links yet. Shorten your first link above!</p>
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </section>
+        </main>
+
+        <!-- Footer -->
+        <footer>
+            <p>&copy; 2026 Horizon TechX. All rights reserved.</p>
+        </footer>
+    </div>
+
+    <!-- Toast Notifications -->
+    <div id="toast-container" class="toast-container"></div>
+
+    <script src="app.js"></script>
+</body>
+</html>
