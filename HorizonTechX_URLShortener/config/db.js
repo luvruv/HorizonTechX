@@ -1,20 +1,22 @@
 const mongoose = require("mongoose");
-const dns = require("dns");
 
 const connectDB = async () => {
     try {
-        // Set DNS servers to Google's public DNS to ensure SRV record resolution works properly
-        dns.setServers(["8.8.8.8", "8.8.4.4"]);
+        const conn = await mongoose.connect(process.env.MONGO_URI, {
+            serverSelectionTimeoutMS: 5000,
+        });
 
-        const conn = await mongoose.connect(process.env.MONGO_URI);
-
-        console.log(`MongoDB Connected: ${conn.connection.host}`);
+        console.log("==================================");
+        console.log("✅ MongoDB Connected Successfully");
+        console.log(`🌐 Host: ${conn.connection.host}`);
+        console.log("==================================");
     } catch (error) {
-        console.log("ERROR NAME:", error.name);
-        console.log("ERROR MESSAGE:", error.message);
-        console.log("FULL ERROR:", error);
+        console.error("==================================");
+        console.error("❌ MongoDB Connection Failed");
+        console.error(error.message);
+        console.error("==================================");
         process.exit(1);
     }
 };
 
-module.exports = connectDB;
+module.exports = connectDB;

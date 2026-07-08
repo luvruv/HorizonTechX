@@ -18,7 +18,6 @@ A premium, full-stack URL shortener application featuring a sleek glassmorphic s
 - **One-Click Clipboard Copying**: Interactive visual "Copied!" feedback and toast alerts.
 - **Duplicate Prevention Cache**: Automatically returns an existing shortened link if the same long URL is input multiple times, reducing database load.
 - **Robust URL Validation**: Verifies URL syntax client-side and server-side to prevent database pollution.
-- **Built-in MongoDB DNS Patch**: Out-of-the-box support for Windows setups resolving MongoDB Atlas SRV query records.
 
 ---
 
@@ -28,7 +27,7 @@ A premium, full-stack URL shortener application featuring a sleek glassmorphic s
 - **Backend Framework**: Express.js
 - **Database Engine**: MongoDB Atlas / Local MongoDB
 - **ODM (Object Document Mapper)**: Mongoose
-- **URL Code Generator**: shortid (v2.2.17)
+- **URL Code Generator**: nanoid
 - **Frontend Layer**: HTML5, Vanilla CSS3 (Custom Grid/Flex, Animations, Glassmorphic Variables), Vanilla JS
 
 ---
@@ -38,7 +37,7 @@ A premium, full-stack URL shortener application featuring a sleek glassmorphic s
 ```text
 HorizonTechX_URLShortener/
 ├── config/
-│   └── db.js            # MongoDB connection settings & DNS bypass configuration
+│   └── db.js            # MongoDB connection settings 
 ├── controllers/
 │   └── urlController.js # API controllers (Shorten, Redirect, and Fetch History)
 ├── models/
