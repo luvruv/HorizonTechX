@@ -2,6 +2,7 @@ const asyncHandler = require('express-async-handler');
 const JobListing = require('../models/JobListing');
 const Application = require('../models/Application');
 const Employer = require('../models/Employer');
+const Candidate = require('../models/Candidate');
 const ApiFeatures = require('../utils/apiFeatures');
 const notify = require('../utils/notify');
 const { expirePastDueJobs } = require('../utils/jobExpiry');
@@ -38,7 +39,27 @@ const createJob = asyncHandler(async (req, res) => {
     status: status || 'active',
   });
 
-  // Notify candidates who have matching skills (optional but great value addition!)
+  // Query employer details to get companyName for notification message
+  const employer = await Employer.findById(req.user._id);
+  const companyName = employer ? employer.companyName : 'An employer';
+
+  // Notify candidates who have matching skills
+  if (job.status === 'active' && job.skillsRequired && job.skillsRequired.length > 0) {
+    const matchingCandidates = await Candidate.find({
+      skills: { $in: job.skillsRequired },
+    });
+
+    for (const cand of matchingCandidates) {
+      await notify({
+        recipientType: 'candidate',
+        recipientId: cand._id,
+        type: 'job_posted',
+        message: `New job alert: "${job.title}" matching your skills has been posted by ${companyName}.`,
+        relatedJob: job._id,
+      });
+    }
+  }
+
   res.status(201).json({ success: true, data: job });
 });
 

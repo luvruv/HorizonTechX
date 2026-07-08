@@ -101,9 +101,11 @@ const shortenUrl = asyncHandler(async (req, res) => {
     }
   }
 
-  const urlCode = customAlias || nanoid(8);
   const baseUrl = process.env.BASE_URL || "http://localhost:5000";
   const shortUrl = `${baseUrl}/${urlCode}`;
+  
+  // Pre-generate QR Code during creation and store it in DB
+  const qrCode = await QRCode.toDataURL(shortUrl);
 
   const newUrl = new Url({
     longUrl,
@@ -111,6 +113,7 @@ const shortenUrl = asyncHandler(async (req, res) => {
     urlCode,
     alias: customAlias || undefined,
     expiresAt: expirationDate,
+    qrCode,
   });
 
   await newUrl.save();
@@ -191,7 +194,7 @@ const getStats = asyncHandler(async (req, res) => {
     dailyClicks[dateStr] = (dailyClicks[dateStr] || 0) + 1;
   });
 
-  const qrCode = await QRCode.toDataURL(url.shortUrl);
+  const qrCode = url.qrCode || await QRCode.toDataURL(url.shortUrl);
   
   res.status(200).json(formatUrlResponse(url, { 
     qrCode,

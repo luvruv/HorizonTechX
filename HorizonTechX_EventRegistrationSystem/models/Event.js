@@ -34,6 +34,7 @@ const Event = sequelize.define('Event', {
   availableSeats: {
     type: DataTypes.INTEGER,
     allowNull: false,
+    validate: { min: 0 },
   },
   organizerId: {
     type: DataTypes.INTEGER,

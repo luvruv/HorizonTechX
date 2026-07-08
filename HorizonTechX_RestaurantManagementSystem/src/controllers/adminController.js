@@ -52,13 +52,20 @@ exports.getPopularItems = async (req, res, next) => {
 // @access Private (admin/manager)
 exports.getReservationsReport = async (req, res, next) => {
   try {
-    // strftime is SQLite-compatible; use DATE() for MySQL
+    const dialect = sequelize.options.dialect;
+    let formatField;
+    if (dialect === 'postgres') {
+      formatField = fn('TO_CHAR', col('reservationTime'), 'YYYY-MM-DD');
+    } else {
+      formatField = fn('strftime', '%Y-%m-%d', col('reservationTime'));
+    }
+
     const report = await Reservation.findAll({
       attributes: [
-        [fn('strftime', '%Y-%m-%d', col('reservationTime')), 'date'],
+        [formatField, 'date'],
         [fn('COUNT', col('id')), 'count'],
       ],
-      group: [fn('strftime', '%Y-%m-%d', col('reservationTime'))],
+      group: [formatField],
       order: [[literal('date'), 'DESC']],
     });
     res.status(200).json({ status: 'success', data: { report } });
@@ -73,23 +80,31 @@ exports.getReservationsReport = async (req, res, next) => {
 exports.getSalesReport = async (req, res, next) => {
   try {
     const { period = 'daily' } = req.query;
-
-    // SQLite uses strftime; PostgreSQL uses TO_CHAR — using strftime for SQLite compatibility
-    let dateFormat;
-    if (period === 'weekly') dateFormat = '%Y-%W';
-    else if (period === 'monthly') dateFormat = '%Y-%m';
-    else dateFormat = '%Y-%m-%d';
+    const dialect = sequelize.options.dialect;
+    
+    let formatField;
+    if (dialect === 'postgres') {
+      let postgresFormat = 'YYYY-MM-DD';
+      if (period === 'weekly') postgresFormat = 'IYYY-IW';
+      else if (period === 'monthly') postgresFormat = 'YYYY-MM';
+      formatField = fn('TO_CHAR', col('createdAt'), postgresFormat);
+    } else {
+      let sqliteFormat = '%Y-%m-%d';
+      if (period === 'weekly') sqliteFormat = '%Y-%W';
+      else if (period === 'monthly') sqliteFormat = '%Y-%m';
+      formatField = fn('strftime', sqliteFormat, col('createdAt'));
+    }
 
     const report = await Order.findAll({
       attributes: [
-        [fn('strftime', dateFormat, col('createdAt')), 'period'],
+        [formatField, 'period'],
         [fn('COUNT', col('id')), 'orderCount'],
         [fn('SUM', col('totalAmount')), 'revenue'],
         [fn('SUM', col('subtotal')), 'subtotal'],
         [fn('SUM', col('taxAmount')), 'taxCollected'],
       ],
       where: { status: 'COMPLETED' },
-      group: [fn('strftime', dateFormat, col('createdAt'))],
+      group: [formatField],
       order: [[literal('period'), 'DESC']],
     });
 
