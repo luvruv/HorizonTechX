@@ -4,7 +4,12 @@
   "description": "",
   "main": "index.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "dev": "nodemon src/app.js",
+    "seed": "node src/seeders/seedData.js",
+    "migrate": "npx sequelize-cli db:migrate",
+    "test": "jest"
+  },
+    "test": "echo \"Error: no test specified\" && exit 1" // removed duplicate
   },
   "keywords": [],
   "author": "",
