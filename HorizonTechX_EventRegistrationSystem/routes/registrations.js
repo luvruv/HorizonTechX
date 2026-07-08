@@ -10,16 +10,23 @@ router.post('/events/:eventId/register', authenticate, async (req, res) => {
   try {
     const event = await Event.findByPk(req.params.eventId);
     if (!event) return res.status(404).json({ message: 'Event not found' });
-    // Check capacity
-    const count = await Registration.count({ where: { eventId: event.id, status: 'confirmed' } });
-    if (event.capacity && count >= event.capacity) {
+    // Prevent registration for past events
+    if (new Date(event.date) < new Date()) {
+      return res.status(400).json({ message: 'Registration closed for past events' });
+    }
+    // Check seat availability
+    if (event.availableSeats <= 0) {
       return res.status(400).json({ message: 'Event is full' });
     }
     // Prevent duplicate registration
     const existing = await Registration.findOne({ where: { eventId: event.id, userId: req.user.id } });
     if (existing) return res.status(409).json({ message: 'Already registered' });
 
+    // Create registration with confirmed status
     const registration = await Registration.create({ eventId: event.id, userId: req.user.id, status: 'confirmed' });
+    // Decrement available seats
+    event.availableSeats -= 1;
+    await event.save();
     res.status(201).json(registration);
   } catch (err) {
     console.error(err);
@@ -38,7 +45,7 @@ router.get('/users/me/registrations', authenticate, async (req, res) => {
   }
 });
 
-// Cancel a registration (owner or admin)
+// Cancel a registration (owner or admin) - soft delete
 router.delete('/registrations/:id', authenticate, async (req, res) => {
   try {
     const registration = await Registration.findByPk(req.params.id);
@@ -46,7 +53,15 @@ router.delete('/registrations/:id', authenticate, async (req, res) => {
     if (registration.userId !== req.user.id && req.user.role !== 'admin') {
       return res.status(403).json({ message: 'Not authorized to cancel this registration' });
     }
-    await registration.destroy();
+    // Update status to cancelled
+    registration.status = 'canceled';
+    await registration.save();
+    // Increment available seats on the event
+    const event = await Event.findByPk(registration.eventId);
+    if (event) {
+      event.availableSeats += 1;
+      await event.save();
+    }
     res.json({ message: 'Registration cancelled' });
   } catch (err) {
     console.error(err);
