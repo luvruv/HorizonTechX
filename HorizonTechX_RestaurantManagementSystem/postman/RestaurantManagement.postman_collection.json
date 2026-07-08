@@ -1,0 +1,126 @@
+{
+  "info": {
+    "name": "HorizonTechX Restaurant Management",
+    "description": "API collection for Restaurant Management System",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "Auth",
+      "item": [
+        {
+          "name": "Login Admin",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"email\": \"admin@restaurant.com\",\n  \"password\": \"admin123\"\n}" },
+            "url": "{{baseUrl}}/api/auth/login"
+          }
+        },
+        {
+          "name": "Register Customer",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"name\": \"John Customer\",\n  \"email\": \"john@example.com\",\n  \"password\": \"password123\",\n  \"role\": \"Customer\"\n}" },
+            "url": "{{baseUrl}}/api/auth/register"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Menu",
+      "item": [
+        { "name": "Get All Menu Items", "request": { "method": "GET", "url": "{{baseUrl}}/api/menu" } },
+        { "name": "Search Menu", "request": { "method": "GET", "url": "{{baseUrl}}/api/menu/search?q=pasta" } },
+        { "name": "Filter by Category", "request": { "method": "GET", "url": "{{baseUrl}}/api/menu/category/1" } }
+      ]
+    },
+    {
+      "name": "Orders",
+      "item": [
+        {
+          "name": "Place Order",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "body": { "mode": "raw", "raw": "{\n  \"tableId\": 1,\n  \"items\": [{ \"menuItemId\": 1, \"quantity\": 2 }]\n}" },
+            "url": "{{baseUrl}}/api/orders"
+          }
+        },
+        {
+          "name": "Update Order Status",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "body": { "mode": "raw", "raw": "{\n  \"status\": \"PREPARING\"\n}" },
+            "url": "{{baseUrl}}/api/orders/1"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Reservations",
+      "item": [
+        {
+          "name": "Create Reservation",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "body": { "mode": "raw", "raw": "{\n  \"tableId\": 2,\n  \"reservationTime\": \"2026-08-15T19:00:00.000Z\",\n  \"guestCount\": 4\n}" },
+            "url": "{{baseUrl}}/api/reservations"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Inventory",
+      "item": [
+        { "name": "Get Inventory", "request": { "method": "GET", "url": "{{baseUrl}}/api/inventory" } },
+        { "name": "Low Stock Alert", "request": { "method": "GET", "url": "{{baseUrl}}/api/inventory?low=true" } }
+      ]
+    },
+    {
+      "name": "Admin Reports",
+      "item": [
+        {
+          "name": "Sales Summary",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "url": "{{baseUrl}}/api/admin/sales"
+          }
+        },
+        {
+          "name": "Sales Report (Daily)",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "url": "{{baseUrl}}/api/admin/sales-report?period=daily"
+          }
+        },
+        {
+          "name": "Popular Items",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "url": "{{baseUrl}}/api/admin/popular-items"
+          }
+        }
+      ]
+    }
+  ],
+  "variable": [
+    { "key": "baseUrl", "value": "http://localhost:3000" },
+    { "key": "token", "value": "" }
+  ]
+}

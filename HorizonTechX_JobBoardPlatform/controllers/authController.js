@@ -5,6 +5,21 @@ const Admin = require('../models/Admin');
 const generateToken = require('../utils/generateToken');
 const { ROLES } = require('../utils/constants');
 
+// Helper to validate email format
+const isValidEmail = (email) => {
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(email).trim());
+};
+
+// Helper to validate password strength
+const validatePassword = (password) => {
+  if (!password || password.length < 8) return 'Password must be at least 8 characters';
+  if (!/[A-Z]/.test(password)) return 'Password must contain at least one uppercase letter';
+  if (!/[0-9]/.test(password)) return 'Password must contain at least one digit';
+  if (!/[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]/.test(password))
+    return 'Password must contain at least one special character';
+  return null;
+};
+
 // @desc    Register a new employer
 // @route   POST /api/auth/register/employer
 // @access  Public
@@ -16,22 +31,34 @@ const registerEmployer = asyncHandler(async (req, res) => {
     throw new Error('name, companyName, email, and password are required');
   }
 
-  const existing = await Employer.findOne({ email });
+  const emailClean = String(email).trim().toLowerCase();
+  if (!isValidEmail(emailClean)) {
+    res.status(400);
+    throw new Error('A valid email address is required');
+  }
+
+  const passwordError = validatePassword(password);
+  if (passwordError) {
+    res.status(400);
+    throw new Error(passwordError);
+  }
+
+  const existing = await Employer.findOne({ email: emailClean });
   if (existing) {
     res.status(400);
     throw new Error('An employer with this email already exists');
   }
 
   const employer = await Employer.create({
-    name,
-    companyName,
-    email,
+    name: String(name).trim(),
+    companyName: String(companyName).trim(),
+    email: emailClean,
     password,
-    phone,
-    companyWebsite,
-    companyDescription,
-    industry,
-    location,
+    phone: phone ? String(phone).trim() : undefined,
+    companyWebsite: companyWebsite ? String(companyWebsite).trim() : undefined,
+    companyDescription: companyDescription ? String(companyDescription).trim() : undefined,
+    industry: industry ? String(industry).trim() : undefined,
+    location: location ? String(location).trim() : undefined,
   });
 
   res.status(201).json({
@@ -58,22 +85,34 @@ const registerCandidate = asyncHandler(async (req, res) => {
     throw new Error('name, email, and password are required');
   }
 
-  const existing = await Candidate.findOne({ email });
+  const emailClean = String(email).trim().toLowerCase();
+  if (!isValidEmail(emailClean)) {
+    res.status(400);
+    throw new Error('A valid email address is required');
+  }
+
+  const passwordError = validatePassword(password);
+  if (passwordError) {
+    res.status(400);
+    throw new Error(passwordError);
+  }
+
+  const existing = await Candidate.findOne({ email: emailClean });
   if (existing) {
     res.status(400);
     throw new Error('A candidate with this email already exists');
   }
 
   const candidate = await Candidate.create({
-    name,
-    email,
+    name: String(name).trim(),
+    email: emailClean,
     password,
-    phone,
-    headline,
-    skills,
-    experienceYears,
-    education,
-    location,
+    phone: phone ? String(phone).trim() : undefined,
+    headline: headline ? String(headline).trim() : undefined,
+    skills: skills || [],
+    experienceYears: experienceYears || 0,
+    education: education ? String(education).trim() : undefined,
+    location: location ? String(location).trim() : undefined,
   });
 
   res.status(201).json({
@@ -111,10 +150,13 @@ const login = asyncHandler(async (req, res) => {
     throw new Error(`Invalid role. Must be one of: ${Object.keys(MODEL_BY_ROLE).join(', ')}`);
   }
 
-  const user = await Model.findOne({ email }).select('+password');
+  const emailClean = String(email).trim().toLowerCase();
+  const user = await Model.findOne({ email: emailClean }).select('+password');
+  
+  // enumeration protection: return generic invalid message, but check password only if user exists
   if (!user || !(await user.comparePassword(password))) {
     res.status(401);
-    throw new Error('Invalid email or password');
+    throw new Error('Invalid email or password credentials');
   }
 
   res.json({

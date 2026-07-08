@@ -11,8 +11,7 @@ const urlSchema = new mongoose.Schema(
 
         longUrl: {
             type: String,
-            required: true,
-            unique: true
+            required: true
         },
 
         shortUrl: {
@@ -44,10 +43,29 @@ const urlSchema = new mongoose.Schema(
             type: Date,
             default: null
         },
-        visitedAt: {
-            type: [Date],
-            default: []
-        }
+        analytics: [
+            {
+                timestamp: {
+                    type: Date,
+                    default: Date.now
+                },
+                ip: {
+                    type: String
+                },
+                userAgent: {
+                    type: String
+                },
+                referrer: {
+                    type: String
+                },
+                browser: {
+                    type: String
+                },
+                os: {
+                    type: String
+                }
+            }
+        ]
     },
     {
         timestamps: true

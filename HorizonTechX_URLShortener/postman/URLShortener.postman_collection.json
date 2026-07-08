@@ -1,0 +1,69 @@
+{
+  "info": {
+    "name": "HorizonTechX URL Shortener",
+    "description": "API collection for URL Shortener project",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "Shorten URL",
+      "request": {
+        "method": "POST",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"longUrl\": \"https://www.google.com\"\n}"
+        },
+        "url": "{{baseUrl}}/api/url/shorten"
+      }
+    },
+    {
+      "name": "Shorten URL (Invalid - empty)",
+      "request": {
+        "method": "POST",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "body": { "mode": "raw", "raw": "{\n  \"longUrl\": \"\"\n}" },
+        "url": "{{baseUrl}}/api/url/shorten"
+      }
+    },
+    {
+      "name": "Get History",
+      "request": {
+        "method": "GET",
+        "url": "{{baseUrl}}/api/url/history"
+      }
+    },
+    {
+      "name": "Get Stats by Code",
+      "request": {
+        "method": "GET",
+        "url": "{{baseUrl}}/api/url/stats/{{urlCode}}"
+      }
+    },
+    {
+      "name": "Get Overall Stats",
+      "request": {
+        "method": "GET",
+        "url": "{{baseUrl}}/api/url/overall/stats"
+      }
+    },
+    {
+      "name": "Redirect (visit short URL)",
+      "request": {
+        "method": "GET",
+        "url": "{{baseUrl}}/{{urlCode}}"
+      }
+    },
+    {
+      "name": "Delete URL",
+      "request": {
+        "method": "DELETE",
+        "url": "{{baseUrl}}/api/url/{{urlCode}}"
+      }
+    }
+  ],
+  "variable": [
+    { "key": "baseUrl", "value": "http://localhost:5000" },
+    { "key": "urlCode", "value": "abc12345" }
+  ]
+}

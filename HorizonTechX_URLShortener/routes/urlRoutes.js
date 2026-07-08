@@ -1,20 +1,19 @@
 const express = require("express");
 const router = express.Router();
-const { shortenUrl, redirectUrl, getHistory, deleteUrl, updateUrl } = require("../controllers/urlController");
+const {
+    shortenUrl,
+    getHistory,
+    deleteUrl,
+    updateUrl,
+    getStats,
+    getOverallStats,
+} = require("../controllers/urlController");
 
-// Shorten URL route
-router.post("/api/url/shorten", shortenUrl);
-
-// History route
-router.get("/api/url/history", getHistory);
-
-// Delete URL route
-router.delete("/api/url/:code", deleteUrl);
-
-// Update URL route
-router.put("/api/url/:code", updateUrl);
-
-// Redirect route (matches any short code, mounted after other static/api routes)
-router.get("/:code", redirectUrl);
+router.post("/shorten", shortenUrl);
+router.get("/history", getHistory);
+router.get("/stats/:code", getStats);
+router.get("/overall/stats", getOverallStats);
+router.delete("/:code", deleteUrl);
+router.put("/:code", updateUrl);
 
 module.exports = router;

@@ -2,17 +2,26 @@ const asyncHandler = require('express-async-handler');
 const fs = require('fs');
 const Resume = require('../models/Resume');
 const Candidate = require('../models/Candidate');
+const Application = require('../models/Application');
+const notify = require('../utils/notify');
 
-// @desc    Upload a resume file for the logged-in candidate
-// @route   POST /api/resumes/upload
-// @access  Private (candidate)
 const uploadResume = asyncHandler(async (req, res) => {
   if (!req.file) {
     res.status(400);
     throw new Error('No resume file was uploaded. Attach a file under the "resume" field.');
   }
 
+  const maxResumes = Number(process.env.MAX_RESUMES_PER_CANDIDATE) || 5;
   const existingCount = await Resume.countDocuments({ candidate: req.user._id });
+
+  if (existingCount >= maxResumes) {
+    // Clean up the uploaded file from disk to prevent orphan storage leaks
+    if (req.file.path) {
+      fs.unlink(req.file.path, () => {});
+    }
+    res.status(400);
+    throw new Error(`Resume limit reached. You can upload a maximum of ${maxResumes} resumes. Please delete an existing resume first.`);
+  }
 
   const resume = await Resume.create({
     candidate: req.user._id,
@@ -21,27 +30,37 @@ const uploadResume = asyncHandler(async (req, res) => {
     filePath: req.file.path,
     fileType: req.file.mimetype,
     fileSizeBytes: req.file.size,
-    isDefault: existingCount === 0, // first uploaded resume becomes the default automatically
+    isDefault: existingCount === 0,
   });
 
   if (existingCount === 0) {
     await Candidate.findByIdAndUpdate(req.user._id, { defaultResume: resume._id });
   }
 
+  const candidate = await Candidate.findById(req.user._id);
+  const activeApplications = await Application.find({
+    candidate: req.user._id,
+    status: { $nin: ['rejected', 'hired', 'withdrawn'] },
+  }).distinct('employer');
+
+  for (const employerId of activeApplications) {
+    await notify({
+      recipientType: 'employer',
+      recipientId: employerId,
+      type: 'resume_uploaded',
+      message: `${candidate.name} updated their active resume portfolio (${req.file.originalname})`,
+      relatedApplication: null,
+    });
+  }
+
   res.status(201).json({ success: true, data: resume });
 });
 
-// @desc    List all resumes uploaded by the logged-in candidate
-// @route   GET /api/resumes/my
-// @access  Private (candidate)
 const getMyResumes = asyncHandler(async (req, res) => {
   const resumes = await Resume.find({ candidate: req.user._id }).sort('-createdAt');
   res.json({ success: true, count: resumes.length, data: resumes });
 });
 
-// @desc    Delete a resume (and its file from disk)
-// @route   DELETE /api/resumes/:id
-// @access  Private (candidate, owner only)
 const deleteResume = asyncHandler(async (req, res) => {
   const resume = await Resume.findById(req.params.id);
 
@@ -54,12 +73,21 @@ const deleteResume = asyncHandler(async (req, res) => {
     throw new Error('Not authorized to delete this resume');
   }
 
-  // Remove the physical file; ignore error if it's already gone.
+  // Prevent deleting a resume if it is currently tied to an active application
+  const activeApplicationCount = await Application.countDocuments({
+    resume: resume._id,
+    status: { $in: ['applied', 'under_review', 'shortlisted', 'interview_scheduled'] },
+  });
+  if (activeApplicationCount > 0) {
+    res.status(400);
+    throw new Error(`Cannot delete this resume as it is linked to ${activeApplicationCount} active job application(s)`);
+  }
+
+  // Delete actual file on disk
   fs.unlink(resume.filePath, () => {});
 
   await resume.deleteOne();
 
-  // If the deleted resume was the candidate's default, clear/reassign it.
   const candidate = await Candidate.findById(req.user._id);
   if (candidate.defaultResume && candidate.defaultResume.toString() === resume._id.toString()) {
     const nextResume = await Resume.findOne({ candidate: req.user._id }).sort('-createdAt');
@@ -74,9 +102,6 @@ const deleteResume = asyncHandler(async (req, res) => {
   res.json({ success: true, message: 'Resume deleted successfully' });
 });
 
-// @desc    Set a resume as the candidate's default
-// @route   PATCH /api/resumes/:id/default
-// @access  Private (candidate, owner only)
 const setDefaultResume = asyncHandler(async (req, res) => {
   const resume = await Resume.findById(req.params.id);
 

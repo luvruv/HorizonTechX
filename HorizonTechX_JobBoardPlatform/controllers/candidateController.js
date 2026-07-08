@@ -1,10 +1,9 @@
 const asyncHandler = require('express-async-handler');
 const Candidate = require('../models/Candidate');
 const Application = require('../models/Application');
+const Resume = require('../models/Resume');
+const { APPLICATION_STATUS_LABELS } = require('../utils/constants');
 
-// @desc    Get a candidate's profile (limited fields if viewed by others)
-// @route   GET /api/candidates/:id
-// @access  Private (candidate self, or employer - useful when reviewing an applicant)
 const getCandidateById = asyncHandler(async (req, res) => {
   const candidate = await Candidate.findById(req.params.id);
   if (!candidate) {
@@ -14,9 +13,6 @@ const getCandidateById = asyncHandler(async (req, res) => {
   res.json({ success: true, data: candidate });
 });
 
-// @desc    Update the logged-in candidate's own profile
-// @route   PUT /api/candidates/profile
-// @access  Private (candidate)
 const updateCandidateProfile = asyncHandler(async (req, res) => {
   const allowedFields = ['name', 'phone', 'headline', 'skills', 'experienceYears', 'education', 'location'];
 
@@ -33,13 +29,10 @@ const updateCandidateProfile = asyncHandler(async (req, res) => {
   res.json({ success: true, data: candidate });
 });
 
-// @desc    Dashboard summary of the logged-in candidate's applications
-// @route   GET /api/candidates/dashboard/applications
-// @access  Private (candidate)
 const getCandidateDashboard = asyncHandler(async (req, res) => {
   const candidateId = req.user._id;
 
-  const [totalApplications, statusBreakdown, recentApplications] = await Promise.all([
+  const [totalApplications, statusBreakdown, recentApplications, resumes, applications] = await Promise.all([
     Application.countDocuments({ candidate: candidateId }),
     Application.aggregate([
       { $match: { candidate: candidateId } },
@@ -48,18 +41,29 @@ const getCandidateDashboard = asyncHandler(async (req, res) => {
     Application.find({ candidate: candidateId })
       .sort('-createdAt')
       .limit(5)
-      .populate('job', 'title companyName location'),
+      .populate({ path: 'job', select: 'title location jobType status', populate: { path: 'employer', select: 'companyName' } }),
+    Resume.find({ candidate: candidateId }).sort('-createdAt'),
+    Application.find({ candidate: candidateId })
+      .sort('-createdAt')
+      .populate({ path: 'job', select: 'title location status', populate: { path: 'employer', select: 'companyName' } })
+      .populate('resume', 'originalName filePath createdAt'),
   ]);
+
+  const statusMap = statusBreakdown.reduce((acc, cur) => {
+    acc[cur._id] = cur.count;
+    acc[APPLICATION_STATUS_LABELS[cur._id] || cur._id] = cur.count;
+    return acc;
+  }, {});
 
   res.json({
     success: true,
     data: {
       totalApplications,
-      applicationsByStatus: statusBreakdown.reduce((acc, cur) => {
-        acc[cur._id] = cur.count;
-        return acc;
-      }, {}),
+      applicationsByStatus: statusMap,
       recentApplications,
+      appliedJobs: applications,
+      resumes,
+      defaultResume: resumes.find((r) => r.isDefault) || resumes[0] || null,
     },
   });
 });

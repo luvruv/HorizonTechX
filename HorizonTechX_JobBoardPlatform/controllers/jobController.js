@@ -1,28 +1,16 @@
 const asyncHandler = require('express-async-handler');
 const JobListing = require('../models/JobListing');
 const Application = require('../models/Application');
+const Employer = require('../models/Employer');
 const ApiFeatures = require('../utils/apiFeatures');
+const notify = require('../utils/notify');
+const { expirePastDueJobs } = require('../utils/jobExpiry');
 
-// @desc    Post a new job listing
-// @route   POST /api/jobs
-// @access  Private (employer)
 const createJob = asyncHandler(async (req, res) => {
   const {
-    title,
-    description,
-    requirements,
-    skillsRequired,
-    location,
-    isRemote,
-    jobType,
-    category,
-    experienceLevel,
-    salaryMin,
-    salaryMax,
-    currency,
-    openings,
-    closingDate,
-    status,
+    title, description, requirements, skillsRequired, location, isRemote,
+    jobType, category, experienceLevel, salaryMin, salaryMax, currency,
+    openings, closingDate, status,
   } = req.body;
 
   if (!title || !description || !location || !jobType) {
@@ -30,37 +18,42 @@ const createJob = asyncHandler(async (req, res) => {
     throw new Error('title, description, location, and jobType are required');
   }
 
+  // Set closing date default to 30 days from now if not provided
+  const closing = closingDate ? new Date(closingDate) : new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
+  if (isNaN(closing.getTime())) {
+    res.status(400);
+    throw new Error('Invalid closing date format');
+  }
+  if (closing <= new Date()) {
+    res.status(400);
+    throw new Error('Closing date must be in the future');
+  }
+
   const job = await JobListing.create({
     employer: req.user._id,
-    title,
-    description,
-    requirements,
-    skillsRequired,
-    location,
-    isRemote,
-    jobType,
-    category,
-    experienceLevel,
-    salaryMin,
-    salaryMax,
-    currency,
-    openings,
-    closingDate,
+    title, description, requirements, skillsRequired, location, isRemote,
+    jobType, category, experienceLevel, salaryMin, salaryMax, currency,
+    openings: openings || 1,
+    closingDate: closing,
     status: status || 'active',
   });
 
+  // Notify candidates who have matching skills (optional but great value addition!)
   res.status(201).json({ success: true, data: job });
 });
 
-// @desc    Search & list job listings with filters, keyword search, sort, pagination
-// @route   GET /api/jobs
-// @query   keyword, location, jobType, category, experienceLevel, skills, salaryMin, salaryMax,
-//          isRemote, status, sort, page, limit
-// @access  Public
 const getJobs = asyncHandler(async (req, res) => {
-  // Public search should only ever surface active jobs unless a status is explicitly
-  // requested by an authenticated employer viewing their own listings (handled by /employers/:id/jobs).
+  await expirePastDueJobs();
+
   const queryString = { status: 'active', ...req.query };
+
+  if (queryString.company) {
+    const employers = await Employer.find({
+      companyName: { $regex: queryString.company, $options: 'i' },
+    }).select('_id');
+    queryString.employer = { $in: employers.map((e) => e._id) };
+    delete queryString.company;
+  }
 
   const totalCountFeatures = new ApiFeatures(JobListing.find(), queryString).search().filter();
   const total = await JobListing.countDocuments(totalCountFeatures.query.getFilter());
@@ -78,10 +71,9 @@ const getJobs = asyncHandler(async (req, res) => {
   });
 });
 
-// @desc    Get single job listing by id (increments view count)
-// @route   GET /api/jobs/:id
-// @access  Public
 const getJobById = asyncHandler(async (req, res) => {
+  await expirePastDueJobs();
+
   const job = await JobListing.findByIdAndUpdate(
     req.params.id,
     { $inc: { views: 1 } },
@@ -96,7 +88,6 @@ const getJobById = asyncHandler(async (req, res) => {
   res.json({ success: true, data: job });
 });
 
-// Helper: ensures the logged-in employer owns the job being modified.
 const assertOwnership = async (jobId, employerId) => {
   const job = await JobListing.findById(jobId);
   if (!job) {
@@ -112,9 +103,6 @@ const assertOwnership = async (jobId, employerId) => {
   return job;
 };
 
-// @desc    Update a job listing
-// @route   PUT /api/jobs/:id
-// @access  Private (employer, owner only)
 const updateJob = asyncHandler(async (req, res) => {
   let job;
   try {
@@ -124,22 +112,17 @@ const updateJob = asyncHandler(async (req, res) => {
     throw err;
   }
 
+  // Strictly filter out 'status' field updates (status has its own dedicated patch route)
   const allowedFields = [
-    'title',
-    'description',
-    'requirements',
-    'skillsRequired',
-    'location',
-    'isRemote',
-    'jobType',
-    'category',
-    'experienceLevel',
-    'salaryMin',
-    'salaryMax',
-    'currency',
-    'openings',
-    'closingDate',
+    'title', 'description', 'requirements', 'skillsRequired', 'location',
+    'isRemote', 'jobType', 'category', 'experienceLevel', 'salaryMin',
+    'salaryMax', 'currency', 'openings', 'closingDate',
   ];
+
+  if (req.body.status !== undefined) {
+    res.status(400);
+    throw new Error('Cannot update job status via this endpoint. Please use the /status PATCH endpoint.');
+  }
 
   allowedFields.forEach((field) => {
     if (req.body[field] !== undefined) job[field] = req.body[field];
@@ -149,9 +132,6 @@ const updateJob = asyncHandler(async (req, res) => {
   res.json({ success: true, data: job });
 });
 
-// @desc    Delete a job listing
-// @route   DELETE /api/jobs/:id
-// @access  Private (employer, owner only)
 const deleteJob = asyncHandler(async (req, res) => {
   let job;
   try {
@@ -161,18 +141,32 @@ const deleteJob = asyncHandler(async (req, res) => {
     throw err;
   }
 
+  // Notify all affected candidates with active applications before deletion
+  const activeApplications = await Application.find({
+    job: job._id,
+    status: { $in: ['applied', 'under_review', 'shortlisted', 'interview_scheduled'] },
+  });
+
+  for (const app of activeApplications) {
+    await notify({
+      recipientType: 'candidate',
+      recipientId: app.candidate,
+      type: 'status_update',
+      message: `The job listing for "${job.title}" has been deleted or closed by the employer. Your application has been archived.`,
+      relatedJob: null,
+      relatedApplication: null,
+    });
+  }
+
   await job.deleteOne();
   await Application.deleteMany({ job: job._id });
 
   res.json({ success: true, message: 'Job listing and its applications have been removed' });
 });
 
-// @desc    Toggle job status (active/closed/draft)
-// @route   PATCH /api/jobs/:id/status
-// @access  Private (employer, owner only)
 const updateJobStatus = asyncHandler(async (req, res) => {
   const { status } = req.body;
-  const validStatuses = ['draft', 'active', 'closed'];
+  const validStatuses = ['draft', 'active', 'closed', 'expired'];
 
   if (!validStatuses.includes(status)) {
     res.status(400);

@@ -1,9 +1,11 @@
-// src/routes/menu.js
 const express = require('express');
 const router = express.Router();
-const { getAll, getOne, create, update, remove } = require('../controllers/menuController');
+const { getAll, getOne, create, update, remove, search, filterByCategory } = require('../controllers/menuController');
 const asyncWrapper = require('../middleware/asyncWrapper');
 const { protect, restrictTo } = require('../middleware/authMiddleware');
+
+router.get('/search', asyncWrapper(search));
+router.get('/category/:categoryId', asyncWrapper(filterByCategory));
 
 router
   .route('/')

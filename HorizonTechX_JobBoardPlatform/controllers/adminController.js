@@ -1,8 +1,11 @@
 const asyncHandler = require('express-async-handler');
+const fs = require('fs');
 const Employer = require('../models/Employer');
 const Candidate = require('../models/Candidate');
 const JobListing = require('../models/JobListing');
 const Application = require('../models/Application');
+const Resume = require('../models/Resume');
+const Notification = require('../models/Notification');
 
 // @desc    Platform-wide overview stats
 // @route   GET /api/admin/stats/overview
@@ -154,6 +157,91 @@ const adminDeleteJob = asyncHandler(async (req, res) => {
   res.json({ success: true, message: 'Job listing removed by admin' });
 });
 
+// @desc    List all jobs platform-wide (moderation)
+// @route   GET /api/admin/jobs
+// @access  Private (admin)
+const listJobs = asyncHandler(async (req, res) => {
+  const page = parseInt(req.query.page, 10) || 1;
+  const limit = parseInt(req.query.limit, 10) || 20;
+
+  const [jobs, total] = await Promise.all([
+    JobListing.find()
+      .populate('employer', 'companyName email')
+      .sort('-createdAt')
+      .skip((page - 1) * limit)
+      .limit(limit),
+    JobListing.countDocuments(),
+  ]);
+
+  res.json({ success: true, page, pages: Math.ceil(total / limit), total, data: jobs });
+});
+
+// @desc    Delete a candidate account along with all their applications, resumes, and physical files
+// @route   DELETE /api/admin/candidates/:id
+// @access  Private (admin)
+const deleteCandidate = asyncHandler(async (req, res) => {
+  const candidate = await Candidate.findById(req.params.id);
+  if (!candidate) {
+    res.status(404);
+    throw new Error('Candidate not found');
+  }
+
+  // 1. Delete physical resume files from disk
+  const resumes = await Resume.find({ candidate: candidate._id });
+  for (const resume of resumes) {
+    if (resume.filePath && fs.existsSync(resume.filePath)) {
+      try {
+        fs.unlinkSync(resume.filePath);
+      } catch (err) {
+        console.error(`Failed to delete resume file: ${resume.filePath}`, err);
+      }
+    }
+  }
+
+  // 2. Delete resumes from database
+  await Resume.deleteMany({ candidate: candidate._id });
+
+  // 3. Delete all candidate applications
+  await Application.deleteMany({ candidate: candidate._id });
+
+  // 4. Delete candidate notifications
+  await Notification.deleteMany({ recipient: candidate._id, recipientModel: 'Candidate' });
+
+  // 5. Delete candidate account
+  await candidate.deleteOne();
+
+  res.json({ success: true, message: 'Candidate account and associated resumes, applications, and files deleted successfully' });
+});
+
+// @desc    Delete an employer account and all their jobs and applications
+// @route   DELETE /api/admin/employers/:id
+// @access  Private (admin)
+const deleteEmployer = asyncHandler(async (req, res) => {
+  const employer = await Employer.findById(req.params.id);
+  if (!employer) {
+    res.status(404);
+    throw new Error('Employer not found');
+  }
+
+  // 1. Find all jobs posted by the employer
+  const jobs = await JobListing.find({ employer: employer._id });
+  const jobIds = jobs.map((j) => j._id);
+
+  // 2. Delete all applications related to these jobs
+  await Application.deleteMany({ job: { $in: jobIds } });
+
+  // 3. Delete all job listings
+  await JobListing.deleteMany({ employer: employer._id });
+
+  // 4. Delete employer notifications
+  await Notification.deleteMany({ recipient: employer._id, recipientModel: 'Employer' });
+
+  // 5. Delete employer account
+  await employer.deleteOne();
+
+  res.json({ success: true, message: 'Employer account and all their posted jobs and applications deleted successfully' });
+});
+
 module.exports = {
   getOverviewStats,
   getJobsByCategory,
@@ -163,4 +251,7 @@ module.exports = {
   listCandidates,
   setEmployerVerification,
   adminDeleteJob,
+  listJobs,
+  deleteCandidate,
+  deleteEmployer,
 };

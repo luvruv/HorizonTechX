@@ -38,23 +38,25 @@ document.addEventListener("DOMContentLoaded", () => {
             const data = await response.json();
 
             if (response.ok) {
-                // Show result
-                shortUrlInput.value = data.shortUrl;
-                visitBtn.href = data.shortUrl;
+                const payload = data.data || data;
+                const shortUrl = payload.shortUrl;
+                shortUrlInput.value = shortUrl;
+                visitBtn.href = shortUrl;
+
+                const msg = data.duplicate
+                    ? "This URL was already shortened — existing link returned."
+                    : "Link shortened successfully!";
+                showMessage(msg, "success");
+                showToast(msg);
                 resultArea.classList.remove("hidden");
-                
-                // Show success status
-                showMessage("Link shortened successfully!", "success");
-                showToast("Success! Link shortened.");
-                
-                // Reset input
                 longUrlInput.value = "";
                 
                 // Refresh list
                 fetchHistory();
             } else {
-                showMessage(data.error || "Something went wrong.", "error");
-                showToast(data.error || "Failed to shorten link.", "danger");
+                const errMsg = data.error?.message || data.message || data.error || "Something went wrong.";
+                showMessage(errMsg, "error");
+                showToast(errMsg, "danger");
             }
         } catch (err) {
             console.error("Shortening error:", err);
@@ -86,7 +88,8 @@ document.addEventListener("DOMContentLoaded", () => {
             const data = await response.json();
 
             if (response.ok) {
-                renderHistory(data);
+                const urls = data.data || (Array.isArray(data) ? data : []);
+                renderHistory(urls);
             } else {
                 console.error("Failed to load history:", data.error);
             }
@@ -110,7 +113,7 @@ document.addEventListener("DOMContentLoaded", () => {
         }
 
         historyList.innerHTML = urls.map(url => {
-            const formattedDate = new Date(url.date).toLocaleDateString(undefined, {
+            const formattedDate = new Date(url.createdAt || url.date).toLocaleDateString(undefined, {
                 year: 'numeric',
                 month: 'short',
                 day: 'numeric'

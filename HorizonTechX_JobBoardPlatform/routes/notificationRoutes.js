@@ -4,11 +4,13 @@ const {
   getMyNotifications,
   markNotificationRead,
   markAllNotificationsRead,
+  deleteNotification,
 } = require('../controllers/notificationController');
 const { protect, authorize } = require('../middleware/auth');
 
 router.get('/my', protect, authorize('employer', 'candidate'), getMyNotifications);
 router.patch('/read-all', protect, authorize('employer', 'candidate'), markAllNotificationsRead);
 router.patch('/:id/read', protect, authorize('employer', 'candidate'), markNotificationRead);
+router.delete('/:id', protect, authorize('employer', 'candidate'), deleteNotification);
 
 module.exports = router;

@@ -10,11 +10,12 @@ if (!fs.existsSync(UPLOAD_DIR)) {
   fs.mkdirSync(UPLOAD_DIR, { recursive: true });
 }
 
-const ALLOWED_MIME_TYPES = [
-  'application/pdf',
-  'application/msword',
-  'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-];
+// Maps MIME types to their valid extensions for strict validation
+const MIME_EXTENSION_MAP = {
+  'application/pdf': ['.pdf'],
+  'application/msword': ['.doc'],
+  'application/vnd.openxmlformats-officedocument.wordprocessingml.document': ['.docx'],
+};
 
 const storage = multer.diskStorage({
   destination: (req, file, cb) => {
@@ -23,16 +24,20 @@ const storage = multer.diskStorage({
   filename: (req, file, cb) => {
     // Unique name prevents collisions/overwrites between candidates.
     const uniqueSuffix = `${Date.now()}-${crypto.randomBytes(6).toString('hex')}`;
-    const ext = path.extname(file.originalname);
+    const ext = path.extname(file.originalname).toLowerCase();
     cb(null, `resume-${uniqueSuffix}${ext}`);
   },
 });
 
 const fileFilter = (req, file, cb) => {
-  if (ALLOWED_MIME_TYPES.includes(file.mimetype)) {
+  const ext = path.extname(file.originalname).toLowerCase();
+  const allowedExtensions = MIME_EXTENSION_MAP[file.mimetype];
+
+  // Cross-validate that both the MIME type is allowed, AND the extension matches that MIME type.
+  if (allowedExtensions && allowedExtensions.includes(ext)) {
     cb(null, true);
   } else {
-    cb(new Error('Only PDF, DOC, and DOCX files are allowed for resumes'), false);
+    cb(new Error('Strict Validation Failed: File extension does not match the MIME content type. Allowed formats: PDF (.pdf), DOC (.doc), DOCX (.docx)'), false);
   }
 };
 
